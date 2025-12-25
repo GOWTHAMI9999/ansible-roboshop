@@ -1,18 +1,41 @@
 - name: configure mysql component
   hosts: mysql
   become: yes
+
   tasks:
-  - name: install mysql server
-    ansible.builtin.dnf:
-      name: mysql-server
-      state: installed
+    - name: disable mariadb
+      ansible.builtin.dnf:
+        name: mariadb*
+        state: absent
 
-  - name: start mysql server
-    ansible.builtin.service:
-      name: mysqld
-      state: started
-      enabled: yes
+    - name: add mysql repo
+      ansible.builtin.get_url:
+        url: https://repo.mysql.com/mysql80-community-release-el9-1.noarch.rpm
+        dest: /tmp/mysql-release.rpm
 
+    - name: install mysql repo
+      ansible.builtin.dnf:
+        name: /tmp/mysql-release.rpm
+        state: present
 
-  - name: setp root password
-    ansible.builtin.command: mysql_secure_installation --set-root-pass RoboShop@1
+    - name: install mysql server
+      ansible.builtin.dnf:
+        name: mysql-community-server
+        state: present
+
+    - name: start mysql server
+      ansible.builtin.service:
+        name: mysqld
+        state: started
+        enabled: yes
+
+    - name: set mysql root password
+      ansible.builtin.shell: |
+        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'RoboShop@1';"
+      args:
+        creates: /root/.mysql_root_password_set
+
+    - name: mark mysql password as set
+      ansible.builtin.file:
+        path: /root/.mysql_root_password_set
+        state: touch
