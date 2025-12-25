@@ -1,39 +1,18 @@
-- name: Configure MySQL Component
+- name: configure mysql component
   hosts: mysql
   become: yes
-
   tasks:
-    - name: Remove MariaDB if present
-      ansible.builtin.dnf:
-        name: mariadb*
-        state: absent
-      ignore_errors: yes
+  - name: install mysql server
+    ansible.builtin.dnf:
+      name: mysql-server
+      state: installed
 
-    - name: Install MySQL repo (RHEL 9)
-      ansible.builtin.dnf:
-        name: https://repo.mysql.com/mysql80-community-release-el9-1.noarch.rpm
-        state: present
-        disable_gpg_check: yes
+  - name: start mysql server
+    ansible.builtin.service:
+      name: mysqld
+      state: started
+      enabled: yes
 
-    - name: Install MySQL Server
-      ansible.builtin.dnf:
-        name: mysql-community-server
-        state: present
 
-    - name: Start and enable MySQL
-      ansible.builtin.service:
-        name: mysqld
-        state: started
-        enabled: yes
-
-    - name: Wait for MySQL port
-      ansible.builtin.wait_for:
-        port: 3306
-        delay: 5
-        timeout: 60
-
-    - name: Set MySQL root password
-      ansible.builtin.command: >
-        mysql_secure_installation --set-root-pass RoboShop@1
-      args:
-        creates: /root/.my.cnf
+  - name: setp root password
+    ansible.builtin.command: mysql_secure_installation --set-root-pass RoboShop@1
