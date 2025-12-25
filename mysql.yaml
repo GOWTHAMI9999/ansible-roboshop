@@ -53,14 +53,14 @@
 
     - name: Configure MySQL root authentication and remote access
       ansible.builtin.shell: |
-      mysql -uroot <<EOF
-      ALTER USER 'root'@'localhost'
-      IDENTIFIED WITH mysql_native_password
-      BY 'RoboShop@1';
-      CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'RoboShop@1';
-      GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
-      FLUSH PRIVILEGES;
-      EOF
+        mysql -uroot <<EOF
+        ALTER USER 'root'@'localhost'
+        IDENTIFIED WITH mysql_native_password
+        BY 'RoboShop@1';
+        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'RoboShop@1';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+        EOF
 
 
     - name: Configure MySQL bind address
