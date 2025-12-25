@@ -1,60 +1,59 @@
-- name: Configure MySQL Component (RHEL)
+- name: Reset MySQL root and enable remote access (RHEL)
   hosts: mysql
   become: yes
+
   vars:
     mysql_root_password: RoboShop@1
 
   tasks:
 
-    - name: Install Python MySQL dependency
+    - name: Install PyMySQL
       ansible.builtin.dnf:
         name: python3-PyMySQL
         state: present
 
-    - name: Remove MariaDB if present
-      ansible.builtin.dnf:
-        name: mariadb*
-        state: absent
-      ignore_errors: yes
+    - name: Stop MySQL
+      ansible.builtin.service:
+        name: mysqld
+        state: stopped
 
-    - name: Install MySQL repo
-      ansible.builtin.dnf:
-        name: https://repo.mysql.com/mysql80-community-release-el9-1.noarch.rpm
-        state: present
-        disable_gpg_check: yes
+    - name: Start MySQL with skip grant tables
+      ansible.builtin.shell: |
+        mysqld_safe --skip-grant-tables --skip-networking &
+      async: 30
+      poll: 0
 
-    - name: Install MySQL server
-      ansible.builtin.dnf:
-        name: mysql-community-server
-        state: present
+    - name: Wait for MySQL socket
+      ansible.builtin.wait_for:
+        path: /var/lib/mysql/mysql.sock
+        timeout: 30
 
-    - name: Start MySQL
+    - name: Reset root authentication and password
+      ansible.builtin.shell: |
+        mysql <<EOF
+        FLUSH PRIVILEGES;
+        ALTER USER 'root'@'localhost'
+        IDENTIFIED WITH mysql_native_password
+        BY '{{ mysql_root_password }}';
+        CREATE USER IF NOT EXISTS 'root'@'%'
+        IDENTIFIED WITH mysql_native_password
+        BY '{{ mysql_root_password }}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+        EOF
+
+    - name: Stop MySQL (safe mode)
+      ansible.builtin.service:
+        name: mysqld
+        state: stopped
+
+    - name: Start MySQL normally
       ansible.builtin.service:
         name: mysqld
         state: started
         enabled: yes
 
-    - name: Set MySQL root password using socket
-      community.mysql.mysql_user:
-        name: root
-        host: localhost
-        password: "{{ mysql_root_password }}"
-        login_unix_socket: /var/lib/mysql/mysql.sock
-        check_implicit_admin: yes
-        priv: "*.*:ALL,GRANT"
-        state: present
-
-    - name: Allow root remote access
-      community.mysql.mysql_user:
-        name: root
-        host: "%"
-        password: "{{ mysql_root_password }}"
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
-        priv: "*.*:ALL,GRANT"
-        state: present
-
-    - name: Allow MySQL remote connections
+    - name: Allow remote MySQL connections
       ansible.builtin.lineinfile:
         path: /etc/my.cnf
         insertafter: '\[mysqld\]'
