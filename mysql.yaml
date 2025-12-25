@@ -12,11 +12,11 @@
         name: python3-PyMySQL
         state: present
 
-    - name: Stop MySQL
+    - name: Stop MySQL if running
       ansible.builtin.service:
         name: mysqld
         state: stopped
-        ignore_errors: yes
+      ignore_errors: yes
 
     - name: Start MySQL in skip-grant-tables mode
       ansible.builtin.shell: |
@@ -26,7 +26,7 @@
       async: 30
       poll: 0
 
-    - name: Wait for MySQL socket (RHEL 9 path)
+    - name: Wait for MySQL socket (RHEL 9)
       ansible.builtin.wait_for:
         path: /var/run/mysqld/mysqld.sock
         timeout: 60
