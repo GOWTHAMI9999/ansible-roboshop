@@ -1,8 +1,15 @@
-- name: Configure MySQL Component
+- name: Configure MySQL Component (RHEL / MySQL 8)
   hosts: mysql
   become: yes
 
   tasks:
+
+    - name: Stop MySQL if running
+      ansible.builtin.service:
+        name: mysqld
+        state: stopped
+      ignore_errors: yes
+
     - name: Remove MariaDB if present
       ansible.builtin.dnf:
         name: mariadb*
@@ -15,72 +22,32 @@
         state: present
         disable_gpg_check: yes
 
-    - name: Import MySQL GPG key
-      ansible.builtin.rpm_key:
-        state: present
-        key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-
     - name: Install MySQL Server
       ansible.builtin.dnf:
         name: mysql-community-server
         state: present
 
-    - name: Start and enable MySQL
+    - name: Start MySQL normally
       ansible.builtin.service:
         name: mysqld
         state: started
         enabled: yes
 
-    - name: Wait for MySQL to be ready
-      ansible.builtin.wait_for:
-        port: 3306
-        delay: 5
-        timeout: 60
-
-    - name: Set MySQL root password
-      ansible.builtin.command: mysql_secure_installation --set-root-pass RoboShop@1
-      args:
-        creates: /root/.my.cnf
-
-    - name: Create MySQL root config
-      ansible.builtin.copy:
-        dest: /root/.my.cnf
-        content: |
-          [client]
-          user=root
-          password=RoboShop@1
-        mode: '0600'
-
-    - name: Fix MySQL root authentication and allow remote access
-      ansible.builtin.shell: |
-        mysql <<EOF
-        ALTER USER 'root'@'localhost'
-        IDENTIFIED WITH mysql_native_password
-        BY 'RoboShop@1';
-
-        CREATE USER IF NOT EXISTS 'root'@'%'
-        IDENTIFIED WITH mysql_native_password
-        BY 'RoboShop@1';
-
-        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
-        FLUSH PRIVILEGES;
-        EOF
-      become: yes
-
-
-
-
-
-    - name: Configure MySQL bind address
-      ansible.builtin.lineinfile:
-        path: /etc/my.cnf
-        regexp: '^bind-address'
-        insertafter: '\[mysqld\]'
-        line: 'bind-address=0.0.0.0'
-      notify: Restart MySQL
-
-  handlers:
-    - name: Restart MySQL
+    - name: Stop MySQL to reset root password
       ansible.builtin.service:
         name: mysqld
-        state: restarted
+        state: stopped
+
+    - name: Start MySQL with skip-grant-tables
+      ansible.builtin.shell: |
+        mysqld_safe --skip-grant-tables --skip-networking &
+      async: 0
+      poll: 0
+
+    - name: Wait for MySQL (skip-grant-tables)
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Reset root password and allow remote access
+      ansible.builtin.shell: |
+        mysql <<EO
