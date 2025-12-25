@@ -1,4 +1,4 @@
-- name: Reset MySQL root and enable remote access (RHEL)
+- name: Reset MySQL root and enable remote access (RHEL 9)
   hosts: mysql
   become: yes
 
@@ -16,21 +16,24 @@
       ansible.builtin.service:
         name: mysqld
         state: stopped
+        ignore_errors: yes
 
-    - name: Start MySQL with skip grant tables
+    - name: Start MySQL in skip-grant-tables mode
       ansible.builtin.shell: |
-        mysqld_safe --skip-grant-tables --skip-networking &
+        mkdir -p /var/run/mysqld
+        chown mysql:mysql /var/run/mysqld
+        mysqld --skip-grant-tables --skip-networking &
       async: 30
       poll: 0
 
-    - name: Wait for MySQL socket
+    - name: Wait for MySQL socket (RHEL 9 path)
       ansible.builtin.wait_for:
-        path: /var/lib/mysql/mysql.sock
-        timeout: 30
+        path: /var/run/mysqld/mysqld.sock
+        timeout: 60
 
-    - name: Reset root authentication and password
+    - name: Reset root password and allow remote access
       ansible.builtin.shell: |
-        mysql <<EOF
+        mysql -S /var/run/mysqld/mysqld.sock <<EOF
         FLUSH PRIVILEGES;
         ALTER USER 'root'@'localhost'
         IDENTIFIED WITH mysql_native_password
@@ -42,10 +45,9 @@
         FLUSH PRIVILEGES;
         EOF
 
-    - name: Stop MySQL (safe mode)
-      ansible.builtin.service:
-        name: mysqld
-        state: stopped
+    - name: Stop MySQL safe mode
+      ansible.builtin.shell: pkill mysqld
+      ignore_errors: yes
 
     - name: Start MySQL normally
       ansible.builtin.service:
@@ -53,7 +55,7 @@
         state: started
         enabled: yes
 
-    - name: Allow remote MySQL connections
+    - name: Allow remote connections
       ansible.builtin.lineinfile:
         path: /etc/my.cnf
         insertafter: '\[mysqld\]'
