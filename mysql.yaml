@@ -1,4 +1,4 @@
-- name: Configure MySQL correctly on RHEL
+- name: Fix MySQL root password properly (RHEL)
   hosts: mysql
   become: yes
 
@@ -6,24 +6,31 @@
     mysql_root_password: RoboShop@1
 
   tasks:
+
     - name: Install PyMySQL
       ansible.builtin.dnf:
         name: python3-PyMySQL
         state: present
 
-    - name: Start MySQL
+    - name: Ensure MySQL is running
       ansible.builtin.service:
         name: mysqld
         state: started
         enabled: yes
 
-    - name: Ensure root password and privileges
+    - name: Get MySQL temporary root password
+      ansible.builtin.shell: |
+        grep 'temporary password' /var/log/mysqld.log | tail -1 | awk '{print $NF}'
+      register: mysql_temp_pass
+      changed_when: false
+
+    - name: Set root password using temporary password
       community.mysql.mysql_user:
         name: root
         host: localhost
         password: "{{ mysql_root_password }}"
         login_user: root
-        login_password: "{{ mysql_root_password }}"
+        login_password: "{{ mysql_temp_pass.stdout }}"
         priv: "*.*:ALL,GRANT"
         state: present
 
