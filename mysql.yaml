@@ -52,9 +52,8 @@
         mode: '0600'
 
     - name: Fix MySQL root authentication and allow remote access
-      become: yes
       ansible.builtin.shell: |
-        sudo mysql <<EOF
+        mysql <<EOF
         ALTER USER 'root'@'localhost'
         IDENTIFIED WITH mysql_native_password
         BY 'RoboShop@1';
@@ -66,6 +65,8 @@
         GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
         FLUSH PRIVILEGES;
         EOF
+      become: yes
+
 
 
 
