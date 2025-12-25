@@ -1,56 +1,18 @@
-- name: Fix MySQL root password properly (RHEL)
+- name: configure mysql component
   hosts: mysql
   become: yes
-
-  vars:
-    mysql_root_password: RoboShop@1
-
   tasks:
+  - name: install mysql server
+    ansible.builtin.dnf:
+      name: mysql-server
+      state: installed
 
-    - name: Install PyMySQL
-      ansible.builtin.dnf:
-        name: python3-PyMySQL
-        state: present
+  - name: start mysql server
+    ansible.builtin.service:
+      name: mysqld
+      state: started
+      enabled: yes
 
-    - name: Ensure MySQL is running
-      ansible.builtin.service:
-        name: mysqld
-        state: started
-        enabled: yes
 
-    - name: Get MySQL temporary root password
-      ansible.builtin.shell: |
-        grep 'temporary password' /var/log/mysqld.log | tail -1 | awk '{print $NF}'
-      register: mysql_temp_pass
-      changed_when: false
-
-    - name: Set root password using temporary password
-      community.mysql.mysql_user:
-        name: root
-        host: localhost
-        password: "{{ mysql_root_password }}"
-        login_user: root
-        login_password: "{{ mysql_temp_pass.stdout }}"
-        priv: "*.*:ALL,GRANT"
-        state: present
-
-    - name: Allow root remote access
-      community.mysql.mysql_user:
-        name: root
-        host: "%"
-        password: "{{ mysql_root_password }}"
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
-        priv: "*.*:ALL,GRANT"
-        state: present
-
-    - name: Allow remote connections
-      ansible.builtin.lineinfile:
-        path: /etc/my.cnf
-        insertafter: '\[mysqld\]'
-        line: 'bind-address=0.0.0.0'
-
-    - name: Restart MySQL
-      ansible.builtin.service:
-        name: mysqld
-        state: restarted
+  - name: setp root password
+    ansible.builtin.command: mysql_secure_installation --set-root-pass RoboShop@1
