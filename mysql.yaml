@@ -50,3 +50,25 @@
           user=root
           password=RoboShop@1
         mode: '0600'
+
+    - name: Allow MySQL root remote access
+      ansible.builtin.shell: |
+        mysql -uroot -pRoboShop@1 -e "
+        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'RoboShop@1';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+        "
+
+    - name: Configure MySQL bind address
+      ansible.builtin.lineinfile:
+        path: /etc/my.cnf
+        regexp: '^bind-address'
+        insertafter: '\[mysqld\]'
+        line: 'bind-address=0.0.0.0'
+      notify: Restart MySQL
+
+  handlers:
+    - name: Restart MySQL
+      ansible.builtin.service:
+        name: mysqld
+        state: restarted
