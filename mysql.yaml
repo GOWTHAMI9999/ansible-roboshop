@@ -6,27 +6,9 @@
     mysql_root_password: RoboShop@1
 
   tasks:
-
-    - name: Install PyMySQL (required for Ansible MySQL modules)
+    - name: Install PyMySQL
       ansible.builtin.dnf:
         name: python3-PyMySQL
-        state: present
-
-    - name: Remove MariaDB if present
-      ansible.builtin.dnf:
-        name: mariadb*
-        state: absent
-      ignore_errors: yes
-
-    - name: Install MySQL repo
-      ansible.builtin.dnf:
-        name: https://repo.mysql.com/mysql80-community-release-el9-1.noarch.rpm
-        state: present
-        disable_gpg_check: yes
-
-    - name: Install MySQL server
-      ansible.builtin.dnf:
-        name: mysql-community-server
         state: present
 
     - name: Start MySQL
@@ -35,18 +17,13 @@
         state: started
         enabled: yes
 
-    - name: Wait for MySQL socket (CORRECT PATH)
-      ansible.builtin.wait_for:
-        path: /var/lib/mysql/mysql.sock
-        timeout: 60
-
-    - name: Set root password using socket auth (first time only)
+    - name: Ensure root password and privileges
       community.mysql.mysql_user:
         name: root
         host: localhost
         password: "{{ mysql_root_password }}"
-        login_unix_socket: /var/lib/mysql/mysql.sock
-        check_implicit_admin: yes
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
         priv: "*.*:ALL,GRANT"
         state: present
 
@@ -65,7 +42,6 @@
         path: /etc/my.cnf
         insertafter: '\[mysqld\]'
         line: 'bind-address=0.0.0.0'
-        state: present
 
     - name: Restart MySQL
       ansible.builtin.service:
