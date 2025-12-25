@@ -51,13 +51,22 @@
           password=RoboShop@1
         mode: '0600'
 
-    - name: Configure MySQL root authentication and remote access
+    - name: Fix MySQL root authentication and allow remote access
+      become: yes
       ansible.builtin.shell: |
-        mysql --user=root --password='RoboShop@1' <<EOF
-        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'RoboShop@1';
+        sudo mysql <<EOF
+        ALTER USER 'root'@'localhost'
+        IDENTIFIED WITH mysql_native_password
+        BY 'RoboShop@1';
+
+        CREATE USER IF NOT EXISTS 'root'@'%'
+        IDENTIFIED WITH mysql_native_password
+        BY 'RoboShop@1';
+
         GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
         FLUSH PRIVILEGES;
         EOF
+
 
 
 
