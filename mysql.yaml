@@ -1,14 +1,10 @@
-- name: Configure MySQL Component (RHEL / MySQL 8)
+- name: Configure MySQL Component (RHEL)
   hosts: mysql
   become: yes
+  vars:
+    mysql_root_password: RoboShop@1
 
   tasks:
-
-    - name: Stop MySQL if running
-      ansible.builtin.service:
-        name: mysqld
-        state: stopped
-      ignore_errors: yes
 
     - name: Remove MariaDB if present
       ansible.builtin.dnf:
@@ -22,32 +18,45 @@
         state: present
         disable_gpg_check: yes
 
-    - name: Install MySQL Server
+    - name: Install MySQL server
       ansible.builtin.dnf:
         name: mysql-community-server
         state: present
 
-    - name: Start MySQL normally
+    - name: Start MySQL
       ansible.builtin.service:
         name: mysqld
         state: started
         enabled: yes
 
-    - name: Stop MySQL to reset root password
+    - name: Set MySQL root password (socket auth)
+      community.mysql.mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        check_implicit_admin: yes
+        priv: "*.*:ALL,GRANT"
+        state: present
+
+    - name: Allow root remote access
+      community.mysql.mysql_user:
+        name: root
+        host: "%"
+        password: "{{ mysql_root_password }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        priv: "*.*:ALL,GRANT"
+        state: present
+
+    - name: Allow MySQL remote connections
+      ansible.builtin.lineinfile:
+        path: /etc/my.cnf
+        insertafter: '\[mysqld\]'
+        line: 'bind-address=0.0.0.0'
+        state: present
+
+    - name: Restart MySQL
       ansible.builtin.service:
         name: mysqld
-        state: stopped
-
-    - name: Start MySQL with skip-grant-tables
-      ansible.builtin.shell: |
-        mysqld_safe --skip-grant-tables --skip-networking &
-      async: 0
-      poll: 0
-
-    - name: Wait for MySQL (skip-grant-tables)
-      ansible.builtin.pause:
-        seconds: 5
-
-    - name: Reset root password and allow remote access
-      ansible.builtin.shell: |
-        mysql <<EO
+        state: restarted
