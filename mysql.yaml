@@ -6,6 +6,11 @@
 
   tasks:
 
+    - name: Install Python MySQL dependency
+      ansible.builtin.dnf:
+        name: python3-PyMySQL
+        state: present
+
     - name: Remove MariaDB if present
       ansible.builtin.dnf:
         name: mariadb*
@@ -29,7 +34,7 @@
         state: started
         enabled: yes
 
-    - name: Set MySQL root password (socket auth)
+    - name: Set MySQL root password using socket
       community.mysql.mysql_user:
         name: root
         host: localhost
